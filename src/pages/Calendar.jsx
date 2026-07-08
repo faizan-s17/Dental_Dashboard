@@ -31,32 +31,40 @@ function londonParts(isoStr) {
   }
 }
 
-function getWeekStart(date) {
-  const p = londonParts(date.toISOString())
-  const weekdayMap = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 }
-  const offset = weekdayMap[p.weekday] ?? 0
-  const d = new Date(date)
-  d.setDate(d.getDate() - offset)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function addDays(date, n) {
-  const d = new Date(date)
-  d.setDate(d.getDate() + n)
-  return d
-}
-
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 function pad2(n) { return String(n).padStart(2, '0') }
 function firstOfMonth(date) { const d = new Date(date); d.setDate(1); d.setHours(0, 0, 0, 0); return d }
 
+function dateStringFromParts(p) {
+  return `${p.year}-${pad2(p.month)}-${pad2(p.day)}`
+}
+
+function londonDateStringFromISO(iso) {
+  return dateStringFromParts(londonParts(iso))
+}
+
+function addDaysLondonDate(dateStr, n) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const noonUTC = new Date(Date.UTC(y, m - 1, d + n, 12, 0, 0))
+  return londonDateStringFromISO(noonUTC.toISOString())
+}
+
+function getWeekStartDate(date) {
+  const p = londonParts(date.toISOString())
+  const weekdayMap = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 }
+  return addDaysLondonDate(dateStringFromParts(p), -(weekdayMap[p.weekday] ?? 0))
+}
+
+function displayDate(value) {
+  return typeof value === 'string' ? new Date(londonToISO(value, '12:00')) : value
+}
+
 function fmt(date) {
-  return date.toLocaleDateString('en-GB', { timeZone: TZ, day: 'numeric', month: 'short' })
+  return displayDate(date).toLocaleDateString('en-GB', { timeZone: TZ, day: 'numeric', month: 'short' })
 }
 
 function fmtFull(date) {
-  return date.toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' })
+  return displayDate(date).toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'short', day: 'numeric', month: 'short' })
 }
 
 function timeLabel(h) {
@@ -79,10 +87,8 @@ function dayIndex(isoStr) {
   return weekdayMap[londonParts(isoStr).weekday] ?? 0
 }
 
-function isSameDay(iso, refDate) {
-  const a = londonParts(iso)
-  const b = londonParts(refDate.toISOString())
-  return a.year === b.year && a.month === b.month && a.day === b.day
+function isSameLondonDate(dateStr, refDate) {
+  return dateStr === londonDateStringFromISO(refDate.toISOString())
 }
 
 function londonToISO(dateStr, timeStr) {
@@ -100,7 +106,7 @@ export default function Calendar({ profile }) {
   const [dentists,    setDentists]    = useState([])
   const [services,    setServices]    = useState([])
   const [selected,    setSelected]    = useState('all')
-  const [weekStart,   setWeekStart]   = useState(() => getWeekStart(new Date()))
+  const [weekStart,   setWeekStart]   = useState(() => getWeekStartDate(new Date()))
   const [appts,       setAppts]       = useState([])
   const [loading,     setLoading]     = useState(true)
   const [detail,      setDetail]      = useState(null)
@@ -130,8 +136,8 @@ export default function Calendar({ profile }) {
       start = londonToISO(`${y}-${pad2(m + 1)}-01`, '00:00')
       end   = londonToISO(`${ny}-${pad2(nm + 1)}-01`, '00:00')
     } else {
-      start = weekStart.toISOString()
-      end   = addDays(weekStart, 7).toISOString()
+      start = londonToISO(weekStart, '00:00')
+      end   = londonToISO(addDaysLondonDate(weekStart, 7), '00:00')
     }
     let q = supabase.from('dental_appointments')
       .select('*')
@@ -148,7 +154,7 @@ export default function Calendar({ profile }) {
 
   useEffect(() => { load() }, [load])
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDaysLondonDate(weekStart, i))
   const today    = new Date()
 
   const apptsByDay = Array.from({ length: 7 }, () => [])
@@ -161,12 +167,17 @@ export default function Calendar({ profile }) {
   const apptsByDate = {}
   if (isMonth) appts.forEach(a => { const day = londonParts(a.start_time).day; (apptsByDate[day] = apptsByDate[day] || []).push(a) })
 
-  function prev() { if (isMonth) setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)); else setWeekStart(d => addDays(d, -7)) }
-  function next() { if (isMonth) setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)); else setWeekStart(d => addDays(d, 7)) }
+  function prev() { if (isMonth) setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() - 1, 1)); else setWeekStart(d => addDaysLondonDate(d, -7)) }
+  function next() { if (isMonth) setMonthCursor(d => new Date(d.getFullYear(), d.getMonth() + 1, 1)); else setWeekStart(d => addDaysLondonDate(d, 7)) }
   function goToday() {
     const now = new Date()
     if (isMonth) { setMonthCursor(firstOfMonth(now)); setMonthSelDay(null) }
-    else { setWeekStart(getWeekStart(now)); setSelectedDay(now.getDay() === 0 ? 6 : now.getDay() - 1) }
+    else {
+      const p = londonParts(now.toISOString())
+      const weekdayMap = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 }
+      setWeekStart(getWeekStartDate(now))
+      setSelectedDay(weekdayMap[p.weekday] ?? 0)
+    }
   }
 
   const confirmedCount = appts.filter(a => a.status === 'confirmed').length
@@ -178,7 +189,7 @@ export default function Calendar({ profile }) {
         <div>
           <h1>Calendar</h1>
           <div className="topbar-sub">
-            {isMonth ? `${MONTHS[monthCursor.getMonth()]} ${monthCursor.getFullYear()}` : `${fmt(weekStart)} – ${fmt(addDays(weekStart, 6))}`} &nbsp;·&nbsp;
+            {isMonth ? `${MONTHS[monthCursor.getMonth()]} ${monthCursor.getFullYear()}` : `${fmt(weekStart)} – ${fmt(addDaysLondonDate(weekStart, 6))}`} &nbsp;·&nbsp;
             <span style={{ color: 'var(--gold)' }}>{confirmedCount} confirmed</span>
             {cancelledCount > 0 && <span style={{ color: 'var(--text-dim)' }}>, {cancelledCount} cancelled</span>}
           </div>
@@ -215,16 +226,17 @@ export default function Calendar({ profile }) {
         {view === 'day' && (
           <div style={{ display: 'flex', gap: 4, marginBottom: 16, overflowX: 'auto' }}>
             {weekDays.map((d, i) => {
-              const isToday = isSameDay(d.toISOString(), today)
+              const isToday = isSameLondonDate(d, today)
               const isSelected = i === selectedDay
               const count = apptsByDay[i].filter(a => a.status !== 'cancelled').length
+              const dayPart = londonParts(londonToISO(d, '12:00')).day
               return (
                 <button key={i} onClick={() => setSelectedDay(i)}
                   style={{ flex: '1 0 60px', padding: '8px 4px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, transition: 'all .15s',
                     background: isSelected ? 'var(--gold)' : isToday ? 'var(--surface3)' : 'var(--surface2)',
                     color: isSelected ? 'var(--on-accent)' : isToday ? 'var(--text)' : 'var(--text-muted)' }}>
                   <div style={{ fontWeight: 700, fontSize: 13 }}>{DAYS[i]}</div>
-                  <div style={{ fontSize: 11, marginTop: 2 }}>{d.getDate()}</div>
+                  <div style={{ fontSize: 11, marginTop: 2 }}>{dayPart}</div>
                   {count > 0 && <div style={{ marginTop: 3, width: 6, height: 6, borderRadius: '50%', background: isSelected ? 'var(--on-accent)' : 'var(--gold)', margin: '4px auto 0' }} />}
                 </button>
               )
@@ -506,12 +518,13 @@ function WeekGrid({ weekDays, apptsByDay, today, onSelect }) {
       <div style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)', borderBottom: '1px solid var(--border)' }}>
         <div style={{ padding: '10px 8px' }} />
         {weekDays.map((d, i) => {
-          const isToday = d.toDateString() === today.toDateString()
+          const isToday = isSameLondonDate(d, today)
+          const dayPart = londonParts(londonToISO(d, '12:00')).day
           return (
             <div key={i} style={{ padding: '10px 6px', textAlign: 'center', borderLeft: '1px solid var(--border)',
               background: isToday ? 'var(--gold-dim)' : 'transparent' }}>
               <div style={{ fontSize: 11, color: isToday ? 'var(--gold)' : 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px' }}>{DAYS[i]}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: isToday ? 'var(--gold)' : 'var(--text)', marginTop: 2 }}>{d.getDate()}</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: isToday ? 'var(--gold)' : 'var(--text)', marginTop: 2 }}>{dayPart}</div>
             </div>
           )
         })}
