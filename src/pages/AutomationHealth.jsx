@@ -35,7 +35,26 @@ export default function AutomationHealth() {
     setLastCall(call.data?.[0]?.created_at || null)
     setLoading(false)
   }, [])
-  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    load()
+
+    const channel = supabase
+      .channel('automation-health-rt')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dental_automation_events' }, ({ new: row }) => {
+        setEvents(prev => [row, ...prev].slice(0, 40))
+        setSupaOk(true)
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dental_appointments' }, ({ new: row }) => {
+        setLastBooking(row.created_at)
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'dental_call_logs' }, ({ new: row }) => {
+        setLastCall(row.created_at)
+      })
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [load])
 
   const lastOf = type => events.find(e => e.event_type === type)?.created_at || null
   const weekAgo = Date.now() - 7 * 86400 * 1000
