@@ -510,80 +510,130 @@ function MonthGrid({ monthCursor, apptsByDate, today, selectedDay, onSelectDay, 
 }
 
 // ─── Week Grid ────────────────────────────────────────────────────────────────
+const HOUR_PX = 64  // pixel height per hour row
+
+// Assign side-by-side columns to overlapping appointments
+function groupDay(appts) {
+  const sorted = [...appts].sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+  const colEnds = []
+  const placed = sorted.map(a => {
+    const s = new Date(a.start_time).getTime()
+    const e = new Date(a.end_time).getTime()
+    let col = colEnds.findIndex(end => end <= s)
+    if (col === -1) { col = colEnds.length; colEnds.push(e) } else colEnds[col] = e
+    return { a, col }
+  })
+  return placed.map(p => {
+    const s = new Date(p.a.start_time).getTime()
+    const e = new Date(p.a.end_time).getTime()
+    const totalCols = placed.reduce((m, q) => {
+      const qs = new Date(q.a.start_time).getTime()
+      const qe = new Date(q.a.end_time).getTime()
+      return qs < e && qe > s ? Math.max(m, q.col + 1) : m
+    }, 1)
+    return { ...p, totalCols }
+  })
+}
+
 function WeekGrid({ weekDays, apptsByDay, today, onSelect }) {
   const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i)
 
+  // Current-time indicator
+  const { hour: nowH, minute: nowM } = londonParts(new Date().toISOString())
+  const nowMins  = nowH * 60 + nowM - HOUR_START * 60
+  const showNow  = nowMins >= 0 && nowMins < TOTAL_MINS
+  const todayIdx = weekDays.findIndex(d => isSameLondonDate(d, today))
+
   return (
     <div style={{ background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ padding: '10px 8px' }} />
+
+      {/* Day header */}
+      <div style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+        <div />
         {weekDays.map((d, i) => {
           const isToday = isSameLondonDate(d, today)
           const dayPart = londonParts(londonToISO(d, '12:00')).day
           return (
-            <div key={i} style={{ padding: '10px 6px', textAlign: 'center', borderLeft: '1px solid var(--border)',
-              background: isToday ? 'var(--gold-dim)' : 'transparent' }}>
-              <div style={{ fontSize: 11, color: isToday ? 'var(--gold)' : 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px' }}>{DAYS[i]}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: isToday ? 'var(--gold)' : 'var(--text)', marginTop: 2 }}>{dayPart}</div>
+            <div key={i} style={{ padding: '10px 6px', textAlign: 'center', borderLeft: '1px solid var(--border)', background: isToday ? 'var(--gold-dim)' : 'transparent' }}>
+              <div style={{ fontSize: 11, color: isToday ? 'var(--gold)' : 'var(--text-dim)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.7px' }}>{DAYS[i]}</div>
+              <div style={{ fontSize: 19, fontWeight: 700, color: isToday ? 'var(--gold)' : 'var(--text)', marginTop: 2 }}>{dayPart}</div>
             </div>
           )
         })}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)', position: 'relative' }}>
-        {hours.map(h => (
-          <div key={h} style={{ display: 'contents' }}>
-            <div style={{ padding: '0 8px', height: 56, display: 'flex', alignItems: 'flex-start', paddingTop: 6,
-              fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>
-              {timeLabel(h)}
-            </div>
-            {weekDays.map((_, i) => (
-              <div key={i} style={{ height: 56, borderLeft: '1px solid var(--border)', borderBottom: '1px solid rgba(42,53,60,.4)', position: 'relative' }} />
-            ))}
-          </div>
-        ))}
+      {/* Scrollable time body */}
+      <div style={{ overflowY: 'auto', maxHeight: 'calc(100vh - 230px)', position: 'relative' }}>
 
+        {/* Hour rows + grid lines */}
+        <div style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)' }}>
+          {hours.map(h => (
+            <div key={h} style={{ display: 'contents' }}>
+              <div style={{ height: HOUR_PX, padding: '4px 8px 0', boxSizing: 'border-box', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, userSelect: 'none' }}>
+                {timeLabel(h)}
+              </div>
+              {Array.from({ length: 7 }, (_, ci) => (
+                <div key={ci} style={{ height: HOUR_PX, borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)', position: 'relative', boxSizing: 'border-box' }}>
+                  {/* Half-hour dashed line */}
+                  <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1px dashed rgba(42,53,60,.7)', pointerEvents: 'none' }} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        {/* Appointment blocks */}
         {apptsByDay.map((dayAppts, dayIdx) =>
-          dayAppts.map(a => {
+          groupDay(dayAppts).map(({ a, col, totalCols }) => {
             const minsIn  = Math.max(0, minsFromDayStart(a.start_time))
             const durMins = Math.max(15, (new Date(a.end_time) - new Date(a.start_time)) / 60000)
-            const topPct  = (minsIn / TOTAL_MINS) * 100
-            const heightPct = (durMins / TOTAL_MINS) * 100
-            const col   = STATUS_COLORS[a.status] || STATUS_COLORS.confirmed
-            const startLabel = fmtTime(a.start_time)
-
+            const topPx   = (minsIn / 60) * HOUR_PX
+            const hPx     = Math.max(26, (durMins / 60) * HOUR_PX - 3)
+            const c       = STATUS_COLORS[a.status] || STATUS_COLORS.confirmed
+            const compact = hPx < 44
+            const cW = `(100% - 52px) / 7 / ${totalCols}`
+            const lOff = `52px + ${dayIdx} * ((100% - 52px) / 7) + ${col} * (${cW}) + 2px`
             return (
               <div key={a.id} onClick={() => onSelect(a)}
                 style={{
-                  position: 'absolute',
-                  top:    `calc(${topPct}% + 0px)`,
-                  height: `calc(${heightPct}% - 2px)`,
-                  left:   `calc(52px + ${dayIdx} * ((100% - 52px) / 7) + 3px)`,
-                  width:  `calc((100% - 52px) / 7 - 6px)`,
-                  background: col.bg,
-                  border: `1px solid ${col.border}`,
-                  borderLeft: `3px solid ${col.border}`,
-                  borderRadius: 5,
-                  padding: '3px 5px',
-                  cursor: 'pointer',
-                  overflow: 'hidden',
-                  zIndex: 2,
-                  transition: 'opacity .15s',
-                  boxSizing: 'border-box'
+                  position: 'absolute', top: topPx, height: hPx,
+                  left: `calc(${lOff})`, width: `calc(${cW} - 4px)`,
+                  background: c.bg, border: `1px solid ${c.border}`, borderLeft: `3px solid ${c.border}`,
+                  borderRadius: 5, padding: compact ? '2px 5px' : '4px 6px',
+                  cursor: 'pointer', overflow: 'hidden', zIndex: 2, boxSizing: 'border-box',
+                  transition: 'filter .15s',
                 }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '.8'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.25)'}
+                onMouseLeave={e => e.currentTarget.style.filter = ''}
               >
-                <div style={{ fontSize: 10, fontWeight: 700, color: col.text, lineHeight: 1.2 }}>{startLabel}</div>
-                <div style={{ fontSize: 11, color: 'var(--text)', fontWeight: 600, lineHeight: 1.2, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {a.patient_name || '—'}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {a.service_name}
-                </div>
+                {compact ? (
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center', overflow: 'hidden' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: c.text, flexShrink: 0 }}>{fmtTime(a.start_time)}</span>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.patient_name}</span>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: c.text, lineHeight: 1.2 }}>{fmtTime(a.start_time)}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', lineHeight: 1.3, marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.patient_name || '—'}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.service_name}</div>
+                  </>
+                )}
               </div>
             )
           })
+        )}
+
+        {/* Live current-time indicator */}
+        {showNow && todayIdx !== -1 && (
+          <div style={{
+            position: 'absolute',
+            top: (nowMins / 60) * HOUR_PX,
+            left: `calc(52px + ${todayIdx} * ((100% - 52px) / 7))`,
+            width: `calc((100% - 52px) / 7)`,
+            height: 2, background: 'var(--red)', zIndex: 4, pointerEvents: 'none',
+          }}>
+            <div style={{ position: 'absolute', left: -1, top: -4, width: 10, height: 10, borderRadius: '50%', background: 'var(--red)' }} />
+          </div>
         )}
       </div>
     </div>
