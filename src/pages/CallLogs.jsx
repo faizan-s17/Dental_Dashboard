@@ -16,13 +16,25 @@ export default function CallLogs() {
   const [search,  setSearch]  = useState('')
   const [detail,  setDetail]  = useState(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true)
     const { data } = await supabase.from('dental_call_logs').select('*').order('created_at', { ascending: false })
     setCalls(data || [])
     setLoading(false)
   }, [])
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    const interval = setInterval(() => load(true), 15000)
+    const channel = supabase
+      .channel('call-logs-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dental_call_logs' }, () => load(true))
+      .subscribe()
+
+    return () => {
+      clearInterval(interval)
+      supabase.removeChannel(channel)
+    }
+  }, [load])
 
   const filtered = calls.filter(c => {
     if (filter === 'booked'     && !c.booked) return false
