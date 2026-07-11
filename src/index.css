@@ -238,6 +238,7 @@ select option { background: var(--surface2); }
 .badge-blue  { background: rgba(96,165,250,.12); color: var(--blue); }
 .badge-gray  { background: var(--surface3); color: var(--text-muted); }
 .badge-red   { background: rgba(248,113,113,.12); color: var(--red); }
+.dropdown-item:hover { background: var(--surface3); }
 
 /* ── Modal ── */
 .modal-overlay {

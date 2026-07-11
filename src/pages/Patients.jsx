@@ -27,6 +27,7 @@ export default function Patients({ profile }) {
   const [search,   setSearch]   = useState('')
   const [detail,   setDetail]   = useState(null)
   const [modal,    setModal]    = useState(null) // 'add' | patient | null
+  const [exportOpen, setExportOpen] = useState(false)
   const [form,     setForm]     = useState(EMPTY)
   const [saving,   setSaving]   = useState(false)
 
@@ -172,9 +173,19 @@ export default function Patients({ profile }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
           <input type="text" placeholder="Search name, phone, treatment…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: 300, maxWidth: '100%' }} />
           <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-ghost btn-sm" onClick={exportCSV} title="Download CSV">↓ CSV</button>
-            <button className="btn btn-ghost btn-sm" onClick={exportPDF} title="Print / Save PDF">↓ PDF</button>
+          <div style={{ display: 'flex', gap: 6, position: 'relative' }}>
+            <div style={{ position: 'relative' }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setExportOpen(o => !o)}>Export ▾</button>
+              {exportOpen && (
+                <div style={{ position: 'absolute', right: 0, top: '100%', marginTop: 4, background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden', zIndex: 50, minWidth: 130, boxShadow: '0 4px 16px rgba(0,0,0,.35)' }}
+                  onMouseLeave={() => setExportOpen(false)}>
+                  <div style={{ padding: '6px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text)' }}
+                    className="dropdown-item" onClick={() => { exportCSV(); setExportOpen(false) }}>Download CSV</div>
+                  <div style={{ padding: '6px 14px', fontSize: 13, cursor: 'pointer', color: 'var(--text)' }}
+                    className="dropdown-item" onClick={() => { exportPDF(); setExportOpen(false) }}>Save as PDF</div>
+                </div>
+              )}
+            </div>
             <button className="btn btn-gold" onClick={openAdd}>+ Add patient</button>
           </div>
         </div>
