@@ -93,6 +93,72 @@ export default function Patients({ profile }) {
     toast.success('Patient deleted'); setDetail(null); load()
   }
 
+  function exportCSV() {
+    const headers = ['Name','Phone','Email','Date of Birth','Type','Treatment Interest','Notes','Visits','Last Visit','Next Visit']
+    const rows = filtered.map(p => {
+      const e = enrich(p)
+      return [
+        p.name, p.phone || '', p.email || '',
+        p.dob ? fmtDate(p.dob) : '',
+        p.patient_type === 'returning' ? 'Existing' : 'New',
+        p.treatment_interest || '',
+        (p.notes || '').replace(/\n/g, ' '),
+        e.visits,
+        e.lastAppt ? fmtDate(e.lastAppt.start_time) : '',
+        e.nextAppt ? fmtDate(e.nextAppt.start_time) : '',
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`)
+    })
+    const csv = [headers.map(h => `"${h}"`).join(','), ...rows.map(r => r.join(','))].join('\n')
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })),
+      download: `patients-${new Date().toISOString().slice(0, 10)}.csv`,
+    })
+    a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  function exportPDF() {
+    const rows = filtered.map(p => {
+      const e = enrich(p)
+      const esc = s => String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      return `<tr>
+        <td>${esc(p.name)}</td><td>${esc(p.phone)}</td><td>${esc(p.email)}</td>
+        <td>${p.dob ? fmtDate(p.dob) : '—'}</td>
+        <td>${p.patient_type === 'returning' ? 'Existing' : 'New'}</td>
+        <td>${esc(p.treatment_interest)}</td>
+        <td style="text-align:center">${e.visits}</td>
+        <td>${e.lastAppt ? fmtDate(e.lastAppt.start_time) : '—'}</td>
+        <td>${e.nextAppt ? fmtDate(e.nextAppt.start_time) : '—'}</td>
+      </tr>`
+    }).join('')
+    const w = window.open('', '_blank')
+    w.document.write(`<!DOCTYPE html><html><head><title>Patient Records</title><style>
+      *{margin:0;padding:0;box-sizing:border-box}
+      body{font-family:Arial,sans-serif;font-size:11px;padding:28px;color:#111}
+      .header{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid #2dd4bf}
+      h1{font-size:20px;font-weight:700;color:#0f2027}
+      .meta{font-size:11px;color:#666;margin-top:4px}
+      .badge{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;text-transform:uppercase}
+      table{border-collapse:collapse;width:100%;margin-top:4px}
+      th{background:#0f2027;color:#2dd4bf;text-align:left;padding:8px 10px;font-size:10px;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap}
+      td{padding:7px 10px;border-bottom:1px solid #e8e8e8;vertical-align:top;font-size:11px}
+      tr:nth-child(even) td{background:#f7f9fa}
+      @media print{body{padding:16px}thead{display:table-header-group}}
+    </style></head><body>
+    <div class="header">
+      <div>
+        <h1>Smile Dental Clinic — Patient Records</h1>
+        <div class="meta">Exported ${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })} · ${filtered.length} record${filtered.length !== 1 ? 's' : ''}</div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>DOB</th><th>Type</th><th>Treatment Interest</th><th>Visits</th><th>Last Visit</th><th>Next Visit</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </body></html>`)
+    w.document.close()
+    setTimeout(() => w.print(), 400)
+  }
+
   return (
     <>
       <div className="topbar">
@@ -106,7 +172,11 @@ export default function Patients({ profile }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
           <input type="text" placeholder="Search name, phone, treatment…" value={search} onChange={e => setSearch(e.target.value)} style={{ width: 300, maxWidth: '100%' }} />
           <div style={{ flex: 1 }} />
-          <button className="btn btn-gold" onClick={openAdd}>+ Add patient</button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-ghost btn-sm" onClick={exportCSV} title="Download CSV">↓ CSV</button>
+            <button className="btn btn-ghost btn-sm" onClick={exportPDF} title="Print / Save PDF">↓ PDF</button>
+            <button className="btn btn-gold" onClick={openAdd}>+ Add patient</button>
+          </div>
         </div>
 
         {loading ? (
