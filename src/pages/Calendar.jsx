@@ -187,9 +187,9 @@ export default function Calendar({ profile }) {
   function exportCSV() {
     const TZ = 'Europe/London'
     const fmtDT = iso => new Date(iso).toLocaleString('en-GB', { timeZone: TZ, day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    const headers = ['Date/Time', 'Patient', 'Service', 'Dentist', 'Status', 'Notes']
+    const headers = ['Date/Time', 'Patient', 'DOB', 'Insurance', 'Service', 'Dentist', 'Status', 'Notes']
     const rows = appts.map(a => [
-      fmtDT(a.start_time), a.patient_name || '', a.service_name || '', a.dentist_name || '', a.status || '', a.notes || ''
+      fmtDT(a.start_time), a.patient_name || '', a.dob || '', a.insurance_note || '', a.service_name || '', a.dentist_name || '', a.status || '', a.notes || ''
     ].map(v => `"${String(v).replace(/"/g, '""')}"`))
     const csv = [headers.map(h => `"${h}"`).join(','), ...rows.map(r => r.join(','))].join('\n')
     const a = Object.assign(document.createElement('a'), {
@@ -354,15 +354,17 @@ export default function Calendar({ profile }) {
                 {detail.booking_id && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{detail.booking_id}</span>}
               </div>
               {[
-                ['Patient',  detail.patient_name],
-                ['Type',     detail.patient_type],
-                ['Phone',    detail.patient_phone],
-                ['Email',    detail.patient_email],
-                ['Service',  detail.service_name],
-                ['Dentist',  detail.dentist_name],
-                ['Date',     new Date(detail.start_time).toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })],
-                ['Time',     fmtTime(detail.start_time) + ' – ' + fmtTime(detail.end_time) + ' (London)'],
-                ['Notes',    detail.notes || '—'],
+                ['Patient',   detail.patient_name],
+                ['Type',      detail.patient_type],
+                ['DOB',       detail.dob || null],
+                ['Insurance', detail.insurance_note || null],
+                ['Phone',     detail.patient_phone],
+                ['Email',     detail.patient_email],
+                ['Service',   detail.service_name],
+                ['Dentist',   detail.dentist_name],
+                ['Date',      new Date(detail.start_time).toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })],
+                ['Time',      fmtTime(detail.start_time) + ' – ' + fmtTime(detail.end_time) + ' (London)'],
+                ['Notes',     detail.notes || '—'],
               ].map(([label, val]) => val && (
                 <div key={label} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', gap: 8, fontSize: 13 }}>
                   <span style={{ color: 'var(--text-dim)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '.5px', paddingTop: 1 }}>{label}</span>
