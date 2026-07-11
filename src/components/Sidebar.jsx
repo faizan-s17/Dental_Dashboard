@@ -12,6 +12,8 @@ const ICONS = {
   patients: <Svg><circle cx="12" cy="8.5" r="3.7" /><path d="M5 20c0-3.6 3.1-5.5 7-5.5s7 1.9 7 5.5" /></Svg>,
   clinic:   <Svg><path d="M12 3l7 3v5.5c0 4.2-3 6.9-7 8-4-1.1-7-3.8-7-8V6z" /></Svg>,
   settings: <Svg><path d="M4 21v-6M4 11V3M12 21v-8M12 9V3M20 21v-4M20 13V3" /><path d="M2 15h4M10 9h4M18 17h4" /></Svg>,
+  sun:  <Svg size={16}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></Svg>,
+  moon: <Svg size={16}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></Svg>,
 }
 
 const NAV = [
@@ -28,7 +30,7 @@ const ToothMark = () => (
   </svg>
 )
 
-export default function Sidebar({ page, setPage, profile }) {
+export default function Sidebar({ page, setPage, profile, theme, toggleTheme }) {
   const initials = profile?.name ? profile.name.replace(/^Dr\.?\s*/i, '').charAt(0).toUpperCase() : '?'
 
   async function logout() {
@@ -66,6 +68,9 @@ export default function Sidebar({ page, setPage, profile }) {
           <strong>{profile?.name || 'Staff'}</strong>
           <span>{profile?.role === 'admin' ? 'Admin' : (profile?.specialty || 'Dentist')}</span>
         </div>
+        <button className="theme-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'} aria-label="Toggle theme">
+          {theme === 'dark' ? ICONS.sun : ICONS.moon}
+        </button>
         <button className="logout-btn" onClick={logout} title="Sign out" aria-label="Sign out">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9" /><path d="M18 16l4-4-4-4" /><path d="M22 12H10" />

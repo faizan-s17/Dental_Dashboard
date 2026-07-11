@@ -21,6 +21,24 @@
   --radius: 8px;
 }
 
+[data-theme="light"] {
+  --bg: #f0f5f4;
+  --surface: #ffffff;
+  --surface2: #e8f0ef;
+  --surface3: #d4e6e3;
+  --border: #bdd0cc;
+  --gold: #0a8080;
+  --gold-dim: rgba(10,128,128,.1);
+  --gold-hover: #087070;
+  --on-accent: #ffffff;
+  --text: #0a1412;
+  --text-muted: #4a6560;
+  --text-dim: #7a9590;
+  --green: #16a34a;
+  --red: #dc2626;
+  --blue: #2563eb;
+}
+
 body {
   font-family: 'Inter', Arial, Helvetica, sans-serif;
   background: var(--bg);
@@ -120,13 +138,14 @@ body {
 .sidebar-user-info { flex: 1; min-width: 0; }
 .sidebar-user-info strong { font-size: 13px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sidebar-user-info span { font-size: 11px; color: var(--gold); }
-.logout-btn {
+.logout-btn, .theme-btn {
   background: none; border: none; color: var(--text-muted);
   cursor: pointer; padding: 4px; border-radius: 4px;
   display: flex; align-items: center; font-size: 16px;
   transition: color .15s;
 }
 .logout-btn:hover { color: var(--red); }
+.theme-btn:hover { color: var(--gold); }
 
 /* ── Topbar ── */
 .topbar {
